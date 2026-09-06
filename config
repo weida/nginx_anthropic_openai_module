@@ -1,0 +1,9 @@
+ngx_module_type=HTTP
+ngx_module_name=ngx_http_anthropic_openai_module
+ngx_module_incs="$ngx_addon_dir/deps/cJSON"
+ngx_module_srcs="$ngx_addon_dir/src/ngx_http_anthropic_openai_module.c \
+                 $ngx_addon_dir/src/ngx_http_anthropic_openai_json.c \
+                 $ngx_addon_dir/src/ngx_http_anthropic_openai_req.c \
+                 $ngx_addon_dir/src/ngx_http_anthropic_openai_sse.c \
+                 $ngx_addon_dir/deps/cJSON/cJSON.c"
+. auto/module

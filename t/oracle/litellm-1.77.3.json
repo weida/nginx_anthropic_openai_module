@@ -1,0 +1,455 @@
+{
+  "recorded_at": "2026-09-05T13:36:09.009925+00:00",
+  "oracle": "LiteLLMAnthropicMessagesAdapter",
+  "version": "1.77.3",
+  "source_path": "litellm/llms/anthropic/experimental_pass_through/adapters/transformation.py",
+  "source_sha256": "298f249e011085313ad5e94923dcb92f0b925d979e063a7e07003eec2faa3377",
+  "network": "No model API calls; local adapter functions only",
+  "cases": [
+    {
+      "name": "text",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "system",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "system": "Answer briefly."
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "system",
+            "content": "Answer briefly."
+          },
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "tools",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "tools": [
+          {
+            "name": "lookup",
+            "description": "Look up a value",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ],
+        "tool_choice": {
+          "type": "auto"
+        }
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "lookup",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "description": "Look up a value"
+            }
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "custom_tool",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "tools": [
+          {
+            "name": "lookup",
+            "description": "Look up a value",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "integer"
+                }
+              }
+            },
+            "type": "custom"
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "lookup",
+              "parameters": {
+                "type": "custom",
+                "properties": {
+                  "x": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "description": "Look up a value"
+            }
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "tool_roundtrip",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "call_1",
+                "name": "lookup",
+                "input": {
+                  "x": 1
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "call_1",
+                "content": "one"
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_1",
+                "type": "function",
+                "function": {
+                  "name": "lookup",
+                  "arguments": "{\"x\": 1}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "content": "one"
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "image",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "source": {
+                  "type": "base64",
+                  "media_type": "image/png",
+                  "data": "aGVsbG8="
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image_url",
+                "image_url": {
+                  "url": "data:image;base64,{'type': 'base64', 'media_type': 'image/png', 'data': 'aGVsbG8='}"
+                }
+              }
+            ]
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "cache_control",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "Brief",
+            "cache_control": {
+              "type": "ephemeral"
+            }
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "Brief",
+                "cache_control": {
+                  "type": "ephemeral"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": "hello"
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "thinking",
+      "kind": "request",
+      "input": {
+        "model": "client-model",
+        "max_tokens": 64,
+        "messages": [
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "hidden",
+                "signature": "test"
+              },
+              {
+                "type": "text",
+                "text": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "model": "client-model",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": "visible"
+          }
+        ],
+        "max_tokens": 64
+      }
+    },
+    {
+      "name": "text_response",
+      "kind": "response",
+      "input": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "client-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "hello"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 7,
+          "completion_tokens": 2,
+          "total_tokens": 9
+        }
+      },
+      "output": {
+        "id": "chatcmpl-test",
+        "type": "message",
+        "role": "assistant",
+        "model": "client-model",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 7,
+          "output_tokens": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "hello"
+          }
+        ],
+        "stop_reason": "end_turn"
+      }
+    },
+    {
+      "name": "tool_response",
+      "kind": "response",
+      "input": {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1,
+        "model": "client-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call_1",
+                  "type": "function",
+                  "function": {
+                    "name": "lookup",
+                    "arguments": "{\"x\":1}"
+                  }
+                }
+              ]
+            },
+            "finish_reason": "tool_calls"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 7,
+          "completion_tokens": 2,
+          "total_tokens": 9
+        }
+      },
+      "output": {
+        "id": "chatcmpl-test",
+        "type": "message",
+        "role": "assistant",
+        "model": "client-model",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 7,
+          "output_tokens": 2
+        },
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "call_1",
+            "name": "lookup",
+            "input": {
+              "x": 1
+            }
+          }
+        ],
+        "stop_reason": "tool_use"
+      }
+    }
+  ]
+}

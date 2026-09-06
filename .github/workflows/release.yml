@@ -1,0 +1,152 @@
+name: Build, test, and release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: nginx ${{ matrix.nginx }} / ${{ matrix.arch }} / ${{ matrix.variant }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx: ['1.26.3', '1.30.4', '1.31.5']
+        arch: [amd64, arm64]
+        variant: [standard, compat]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      NGINX_VERSION: ${{ matrix.nginx }}
+      BUILD_ARCH: ${{ matrix.arch }}
+      BUILD_VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check scripts and public source history
+        run: |
+          python3 -m unittest discover -s t -p 'test_*.py'
+          python3 scripts/check-public.py --history
+      - name: Select pinned native baseline
+        shell: bash
+        run: |
+          if [[ "$BUILD_VARIANT" == standard ]]; then
+            image='ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517'
+          elif [[ "$BUILD_ARCH" == amd64 ]]; then
+            image='quay.io/pypa/manylinux2014_x86_64@sha256:493d2032114d757aaa761a9385ad8497f391503bf71acef9abeeb66682ca5d90'
+          else
+            image='quay.io/pypa/manylinux2014_aarch64@sha256:f4cd164263e4ec2b7da7ee40b319bb5e30f0d7a2abd7ad4730e716a512dfb529'
+          fi
+          echo "BUILD_IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Build module and verify load on baseline libc
+        run: |
+          docker build --build-arg "BASE_IMAGE=$BUILD_IMAGE" -f ci/Dockerfile -t module-builder .
+          docker run --rm -v "$PWD:/work" -w /work module-builder \
+            python3 scripts/build.py --nginx-version "$NGINX_VERSION"
+          sudo chown -R "$(id -u):$(id -g)" build .build-src
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: t/sdk/package-lock.json
+      - name: Install host test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential binutils cpanminus libpcre2-dev
+          cpanm --mirror https://cpan.metacpan.org --mirror-only --local-lib-contained "$HOME/perl5" --notest Test::Nginx
+          echo "PERL5LIB=$HOME/perl5/lib/perl5" >> "$GITHUB_ENV"
+          npm ci --prefix t/sdk
+      - name: Full regression and UBSan against the produced nginx
+        run: |
+          export NGX_SRC="$PWD/.build-src/nginx-$NGINX_VERSION"
+          export TEST_NGINX_BINARY="$PWD/build/nginx"
+          make test ubsan-test SKIP_MODULE_BUILD=1
+      - name: Package and inspect public artifacts
+        run: |
+          python3 scripts/package.py --nginx-version "$NGINX_VERSION" \
+            --variant "$BUILD_VARIANT" --arch "$BUILD_ARCH" \
+            --source-commit "$GITHUB_SHA" --build-image "$BUILD_IMAGE"
+          python3 scripts/check-public.py --history --artifacts dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: module-${{ matrix.nginx }}-${{ matrix.arch }}-${{ matrix.variant }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish fully tested release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: module-*
+          path: dist
+          merge-multiple: true
+      - name: Verify complete matrix and release checksums
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import itertools
+          import json
+          import os
+          assets = list(Path('dist').iterdir())
+          for suffix in ('.so', '.tar.gz', '.json'):
+              count = sum(p.name.endswith(suffix) for p in assets)
+              if count != 12:
+                  raise SystemExit(f'Expected 12 {suffix} assets, found {count}')
+          expected = set(itertools.product(
+              ('1.26.3', '1.30.4', '1.31.5'), ('amd64', 'arm64'), ('standard', 'compat')))
+          seen = set()
+          for path in Path('dist').glob('*.json'):
+              info = json.loads(path.read_text())
+              key = (info['nginx_version'], info['architecture'], info['variant'])
+              if key not in expected or key in seen:
+                  raise SystemExit('Unexpected or duplicate matrix artifact')
+              seen.add(key)
+              if info['source_commit'] != os.environ['GITHUB_SHA']:
+                  raise SystemExit('Artifact source commit mismatch')
+              module = path.with_suffix('.so')
+              if hashlib.sha256(module.read_bytes()).hexdigest() != info['module_sha256']:
+                  raise SystemExit('Artifact digest mismatch')
+          if seen != expected:
+              raise SystemExit('Missing matrix artifacts')
+          PY
+          python3 scripts/check-public.py --history --artifacts dist
+          (cd dist && sha256sum -- *.so *.tar.gz *.json > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - name: Publish tag assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-rc* ]]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" dist/* --verify-tag \
+            --title "$RELEASE_TAG" --generate-notes "${flags[@]}"
