@@ -149,4 +149,4 @@ jobs:
           flags=()
           if [[ "$RELEASE_TAG" == *-rc* ]]; then flags+=(--prerelease); fi
           gh release create "$RELEASE_TAG" dist/* --verify-tag \
-            --title "$RELEASE_TAG" --generate-notes "${flags[@]}"
+            --title "$RELEASE_TAG" --notes-file docs/release-notes.md "${flags[@]}"

@@ -9,9 +9,17 @@ The module implements a defined protocol subset, including text, supported image
 and function tools. It does not provide an Anthropic service or a model tokenizer.
 See [protocol behavior](docs/protocol.md) before selecting a backend.
 
+## Downloads
+
+See [GitHub Releases](https://github.com/weida/nginx_anthropic_openai_module/releases)
+for published builds. Each target provides a `.so`, a bundle with licenses, and
+JSON build metadata; `SHA256SUMS` covers all release assets. Choose the exact
+nginx version, Linux architecture, and standard or compat variant. See the
+[compatibility guide](docs/build-and-test.md) before loading a download.
+
 ## Build
 
-On Linux, provide a C compiler, make, Python 3, PCRE2 and zlib development libraries.
+On Linux, provide a C compiler, make, Python 3, PCRE2 development libraries.
 Use a checkout path without spaces. The build helper downloads the selected nginx
 source and builds a matching test nginx and module in `build/`:
 
