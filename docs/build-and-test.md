@@ -12,7 +12,9 @@ make test NGX_SRC=.build-src/nginx-1.26.3 TEST_NGINX_BINARY="$PWD/build/nginx"
 make ubsan-test NGX_SRC=.build-src/nginx-1.26.3
 ```
 
-The helper builds nginx and the dynamic module together. Outputs are
+The helper builds nginx and the dynamic module together. The paired test nginx
+omits gzip and HTTP basic auth to avoid unnecessary runtime dependencies; this
+does not change the bridge's upstream API-key support. Outputs are
 `build/nginx` and `build/ngx_http_anthropic_openai_module.so`. nginx configure
 rewrites its source tree's Makefile, so do not use a source tree that another
 build owns. Build and test one nginx version at a time in each checkout.

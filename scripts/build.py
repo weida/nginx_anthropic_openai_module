@@ -71,6 +71,8 @@ def main():
     flags = [
         '--prefix=/opt/nginx-module-test', '--builddir=' + str(build),
         '--with-compat', '--with-stream', '--without-http_gzip_module',
+        # The paired test nginx must not depend on a baseline-specific libcrypt.
+        '--without-http_auth_basic_module',
         '--add-dynamic-module=' + str(ROOT),
         '--with-cc-opt=-O2 -ffile-prefix-map=' + str(ROOT) + '=/work/public-module',
     ]
