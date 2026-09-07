@@ -4,19 +4,16 @@
 #include <stddef.h>
 #include "cJSON.h"
 
-struct ngx_log_s;
-
 cJSON *ngx_http_ao_json_parse(unsigned char *p, size_t n);
 
 typedef struct {
-    const char      *model_override;
-    int              stream_usage;
-    int              client_stream;
-    char             orig_model[256];
-    const char      *err;
-    int              err_status;
-    int              max_tools;     /* 0 means use built-in default (256) */
-    struct ngx_log_s *log;      /* may be NULL; falls back to cycle log */
+    const char  *model_override;
+    int          stream_usage;
+    int          client_stream;
+    char         orig_model[256];
+    const char  *err;
+    int          err_status;
+    int          max_tools;     /* 0 means use built-in default (256) */
 } ngx_http_ao_req_opt_t;
 
 char *ngx_http_ao_convert_request(unsigned char *p, size_t n,

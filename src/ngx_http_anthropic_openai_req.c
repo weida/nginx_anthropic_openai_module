@@ -1,13 +1,8 @@
 #include "ngx_http_anthropic_openai_json.h"
-#include "ngx_http_ao_compat.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* Resolve the best available log target. module.c always sets opt->log;
-   fall back to NULL (the stub goes to stderr) if not provided. */
-#define AO_LOG(opt)  ((opt) && (opt)->log ? (opt)->log : (ngx_log_t *) NULL)
 
 static char *
 ngx_http_ao_fail_req(ngx_http_ao_req_opt_t *opt, const char *msg)
@@ -624,53 +619,62 @@ ngx_http_ao_convert_request(unsigned char *p, size_t n,
         rs = (role && cJSON_IsString(role)) ? role->valuestring : "";
         if (strcmp(rs, "user") == 0) {
             if (ngx_http_ao_append_user_content(msgs, content) != 0) {
-                ngx_log_error(NGX_LOG_WARN,
-                              AO_LOG(opt), 0,
-                              "anthropic_openai: dropping user message with "
-                              "unsupported content block");
-                continue;
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "unsupported content block");
             }
         } else if (strcmp(rs, "assistant") == 0) {
             if (ngx_http_ao_append_assistant(msgs, content) != 0) {
-                ngx_log_error(NGX_LOG_WARN,
-                              AO_LOG(opt), 0,
-                              "anthropic_openai: dropping assistant message "
-                              "with unsupported content block");
-                continue;
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "unsupported content block");
             }
         } else if (strcmp(rs, "system") == 0) {
-            /* Anthropic beta mid-conversation-system-2026-04-07 injects
-               a system-role message inside messages[]. Fold it into the
-               OpenAI conversation as a system message instead of failing. */
-            cJSON  *sysmsg, *joined;
-            int     has_image, bad;
+            cJSON  *sysmsg, *joined, *block, *type, *text;
+            int     has_image, bad, valid;
 
-            if (cJSON_IsString(content)) {
-                sysmsg = cJSON_CreateObject();
-                cJSON_AddStringToObject(sysmsg, "role", "system");
-                cJSON_AddStringToObject(sysmsg, "content",
-                    content->valuestring ? content->valuestring : "");
-                cJSON_AddItemToArray(msgs, sysmsg);
-            } else if (cJSON_IsArray(content)) {
-                joined = ngx_http_ao_join_text(content, &has_image, &bad);
-                if (joined != NULL) {
-                    sysmsg = cJSON_CreateObject();
-                    cJSON_AddStringToObject(sysmsg, "role", "system");
-                    cJSON_AddItemToObject(sysmsg, "content", joined);
-                    cJSON_AddItemToArray(msgs, sysmsg);
-                } else {
-                    ngx_log_error(NGX_LOG_WARN,
-                                  AO_LOG(opt),
-                                  0,
-                                  "anthropic_openai: dropping system-role "
-                                  "message with unsupported content");
+            valid = cJSON_IsString(content) || cJSON_IsArray(content);
+            if (cJSON_GetObjectItemCaseSensitive(item, "clear_at") != NULL
+                || cJSON_GetObjectItemCaseSensitive(item, "output_config")
+                   != NULL)
+            {
+                valid = 0;
+            }
+            if (cJSON_IsArray(content)) {
+                cJSON_ArrayForEach(block, content) {
+                    type = cJSON_GetObjectItemCaseSensitive(block, "type");
+                    text = cJSON_GetObjectItemCaseSensitive(block, "text");
+                    if (!cJSON_IsObject(block) || !cJSON_IsString(type)
+                        || strcmp(type->valuestring, "text") != 0
+                        || !cJSON_IsString(text))
+                    {
+                        valid = 0;
+                        break;
+                    }
                 }
             }
+            if (!valid) {
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "unsupported system content");
+            }
+
+            joined = ngx_http_ao_join_text(content, &has_image, &bad);
+            sysmsg = cJSON_CreateObject();
+            if (joined == NULL || sysmsg == NULL || has_image || bad) {
+                cJSON_Delete(joined);
+                cJSON_Delete(sysmsg);
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "system conversion failed");
+            }
+            cJSON_AddStringToObject(sysmsg, "role", "system");
+            cJSON_AddItemToObject(sysmsg, "content", joined);
+            cJSON_AddItemToArray(msgs, sysmsg);
         } else {
-            ngx_log_error(NGX_LOG_WARN,
-                          AO_LOG(opt), 0,
-                          "anthropic_openai: dropping message with "
-                          "unsupported role '%s'", rs);
+            cJSON_Delete(out);
+            cJSON_Delete(root);
+            return ngx_http_ao_fail_req(opt, "invalid role");
         }
     }
 

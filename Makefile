@@ -22,7 +22,7 @@ conv-test: t/conv_test
 	./t/conv_test
 
 t/conv_test: t/conv_test.c $(CONV_SRC) $(wildcard src/*.h) deps/cJSON/cJSON.h
-	$(CC) $(CFLAGS) $(INCS) -DNGX_HTTP_AO_NO_NGX -o $@ t/conv_test.c $(CONV_SRC)
+	$(CC) $(CFLAGS) $(INCS) -o $@ t/conv_test.c $(CONV_SRC)
 
 modules:
 ifeq ($(SKIP_MODULE_BUILD),1)
@@ -38,7 +38,7 @@ clean:
 
 build/libao-conv.so: $(CONV_SRC) $(wildcard src/*.h)
 	mkdir -p build
-	$(CC) $(CFLAGS) -shared -fPIC $(INCS) -DNGX_HTTP_AO_NO_NGX -o $@ $(CONV_SRC)
+	$(CC) $(CFLAGS) -shared -fPIC $(INCS) -o $@ $(CONV_SRC)
 
 stream-test: build/libao-conv.so
 	python3 t/stream_regression.py

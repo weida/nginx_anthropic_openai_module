@@ -13,7 +13,8 @@ my ($dir, $nginx, $port, $listener, $serial, $owner);
 sub message { return {model=>'client-model',max_tokens=>64,messages=>[{role=>'user',content=>'hello'}], @_}; }
 sub completion { return {id=>'chatcmpl-test',model=>'backend-model',choices=>[{index=>0,message=>{role=>'assistant',content=>'hello'},finish_reason=>'stop'}],usage=>{prompt_tokens=>7,completion_tokens=>2}, @_}; }
 sub start_nginx {
-    my ($extra)=@_;
+    my ($extra, $server_extra)=@_;
+    $server_extra //= '';
     $owner=$$;
     $dir=tempdir('ao-integration-XXXXXX',TMPDIR=>1,CLEANUP=>1);
     mkdir "$dir/logs";
@@ -30,6 +31,7 @@ events { worker_connections 128; }
 http { access_log off; client_body_temp_path $dir/body;
 proxy_temp_path $dir/proxy; client_max_body_size 32m;
 server { listen 127.0.0.1:$port;
+$server_extra
 client_body_buffer_size 1k;
 location / { anthropic_openai on; anthropic_openai_model qwen;
 proxy_pass http://127.0.0.1:$up/v1/chat/completions;

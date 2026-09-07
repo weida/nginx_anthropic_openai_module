@@ -14,7 +14,7 @@ from their enclosing context.
 | `anthropic_openai_api_key KEY` | empty | Override upstream credentials with `Authorization: Bearer KEY`. |
 | `anthropic_openai_count_tokens heuristic\|off` | `heuristic` | Estimate tokens locally, or return HTTP 501 for count requests. |
 | `anthropic_openai_stream_usage on\|off` | `on` | Request OpenAI streaming usage; disable for backends that reject it. |
-| `anthropic_openai_max_tools N` | `256` | Maximum number of tools accepted from a single request; larger lists are rejected with a self-describing 400. Raise to support clients (e.g. Claude Code) that send many tools. |
+| `anthropic_openai_max_tools N` | `256` | Maximum number of tool definitions accepted from a single request (integer 1–2147483647; zero and out-of-range values are configuration errors); larger lists are rejected with a self-describing 400. Raise to support clients (e.g. Claude Code) that send many tools. |
 
 Without an override, the incoming `x-api-key` becomes an upstream bearer token.
 An existing Authorization header can pass through when no replacement key is

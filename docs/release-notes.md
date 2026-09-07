@@ -8,6 +8,6 @@ Publication requires all twelve build/load, local regression and artifact-check 
 
 ## Changes in this build
 
-- **`role: system` mid-conversation support.** The Anthropic `system` role (used by the `mid-conversation-system-2026-04-07` beta and emitted by Claude Code) is folded into the OpenAI upstream system message instead of being rejected.
+- **`role: system` mid-conversation support.** Text-only `system` entries are preserved as separate OpenAI system messages at the original conversation position. Unsupported content remains a 400 error.
 - **Configurable tool cap.** The hard 32-tool ceiling is replaced by `anthropic_openai_max_tools` (default 256). Raise it to support clients that ship large tool sets; oversized requests get a self-describing 400.
 - **Self-describing request errors.** When request conversion fails, the failure reason is now logged at `error` level and surfaced in the response body rather than dropped on the floor.

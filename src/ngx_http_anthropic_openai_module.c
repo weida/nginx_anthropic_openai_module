@@ -31,6 +31,10 @@ static ngx_conf_enum_t  ngx_http_ao_count_tokens_enum[] = {
     { ngx_null_string, 0 }
 };
 
+static ngx_conf_num_bounds_t  ngx_http_ao_max_tools_bounds = {
+    ngx_conf_check_num_bounds, 1, NGX_MAX_INT32_VALUE
+};
+
 static ngx_command_t  ngx_http_anthropic_openai_commands[] = {
 
     { ngx_string("anthropic_openai"),
@@ -73,7 +77,7 @@ static ngx_command_t  ngx_http_anthropic_openai_commands[] = {
       ngx_conf_set_num_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_anthropic_openai_loc_conf_t, max_tools),
-      NULL },
+      &ngx_http_ao_max_tools_bounds },
 
       ngx_null_command
 };
@@ -473,7 +477,6 @@ ngx_http_anthropic_openai_request_body_filter(ngx_http_request_t *r,
     alcf = ngx_http_get_module_loc_conf(r, ngx_http_anthropic_openai_module);
     ngx_memzero(&opt, sizeof(opt));
     opt.stream_usage = (alcf->stream_usage != 0);
-    opt.log = r->connection->log;
     opt.max_tools = (int) alcf->max_tools;
     if (alcf->model.len) {
         u_char  *m;
@@ -490,6 +493,7 @@ ngx_http_anthropic_openai_request_body_filter(ngx_http_request_t *r,
                                             &opt, &out_n);
     if (converted == NULL) {
         const char  *reason;
+
         reason = opt.err != NULL ? opt.err : "request conversion failed";
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
                       "anthropic_openai: request rejected (%s)", reason);

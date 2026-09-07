@@ -45,7 +45,7 @@ typedef struct {
     ngx_str_t                api_key;
     ngx_uint_t               count_tokens;
     ngx_flag_t               stream_usage;
-    ngx_uint_t               max_tools;     /* 0 means unset → default 256 */
+    ngx_uint_t               max_tools;     /* positive tool definition limit */
 } ngx_http_anthropic_openai_loc_conf_t;
 
 typedef struct {
@@ -62,10 +62,7 @@ typedef struct {
     size_t                   req_len;
     size_t                   req_cap;
 
-    /* If request conversion fails, holds a static-ish pointer to a short
-       reason (e.g. "invalid role"). Cleared on the next successful
-       conversion. Surfaced in the error response body so 400s are
-       self-describing. */
+    /* Static conversion error reason for the client response. */
     const char              *req_err;
 
     u_char                  *resp_buf;

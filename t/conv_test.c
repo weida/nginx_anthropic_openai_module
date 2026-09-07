@@ -132,9 +132,7 @@ main(void)
     }
 
     {
-        /* Anthropic beta mid-conversation-system injects a system-role
-           message inside messages[]. It must be folded into the OpenAI
-           conversation as a system message instead of failing. */
+        /* Preserve a text system-role message at its conversation position. */
         ngx_http_ao_req_opt_t  opt;
         char                  *out;
         size_t                 out_n;
@@ -153,9 +151,7 @@ main(void)
                     opt.err ? opt.err : "null");
             g_fail++;
         } else {
-            /* Two system messages expected: one from the injected role,
-               plus the original user "hi". The OpenAI message count
-               should be at least 2, with at least one role=system. */
+            /* Preserve both the injected system message and original user. */
             if (strstr(out, "\"role\":\"system\"") == NULL
                 || strstr(out, "session summary") == NULL
                 || strstr(out, "\"role\":\"user\"") == NULL)
@@ -170,7 +166,7 @@ main(void)
     }
 
     {
-        /* Unknown role in messages[] must be skipped with WARN, not fail. */
+        /* Unknown roles must fail without sending a partial conversation. */
         ngx_http_ao_req_opt_t  opt;
         char                  *out;
         size_t                 out_n;
@@ -184,17 +180,15 @@ main(void)
         memset(&opt, 0, sizeof(opt));
         out = ngx_http_ao_convert_request((unsigned char *) in, strlen(in),
                                           &opt, &out_n);
-        if (out == NULL) {
-            fprintf(stderr, "FAIL req_unknown_role should skip, got err: %s\n",
-                    opt.err ? opt.err : "null");
-            g_fail++;
-        } else if (strstr(out, "beep") != NULL) {
-            fprintf(stderr, "FAIL req_unknown_role kept robot msg: %s\n", out);
+        if (out != NULL || opt.err == NULL
+            || strcmp(opt.err, "invalid role") != 0)
+        {
+            fprintf(stderr, "FAIL req_unknown_role must reject\n");
             g_fail++;
         } else {
             printf("ok req_unknown_role\n");
-            free(out);
         }
+        free(out);
     }
 
     {
