@@ -132,6 +132,72 @@ main(void)
     }
 
     {
+        /* Anthropic beta mid-conversation-system injects a system-role
+           message inside messages[]. It must be folded into the OpenAI
+           conversation as a system message instead of failing. */
+        ngx_http_ao_req_opt_t  opt;
+        char                  *out;
+        size_t                 out_n;
+        const char            *in =
+            "{\"model\":\"claude-x\",\"max_tokens\":16,"
+            "\"messages\":["
+            "{\"role\":\"user\",\"content\":\"hi\"},"
+            "{\"role\":\"system\",\"content\":\"session summary\"}"
+            "]}";
+
+        memset(&opt, 0, sizeof(opt));
+        out = ngx_http_ao_convert_request((unsigned char *) in, strlen(in),
+                                          &opt, &out_n);
+        if (out == NULL) {
+            fprintf(stderr, "FAIL req_system_role: %s\n",
+                    opt.err ? opt.err : "null");
+            g_fail++;
+        } else {
+            /* Two system messages expected: one from the injected role,
+               plus the original user "hi". The OpenAI message count
+               should be at least 2, with at least one role=system. */
+            if (strstr(out, "\"role\":\"system\"") == NULL
+                || strstr(out, "session summary") == NULL
+                || strstr(out, "\"role\":\"user\"") == NULL)
+            {
+                fprintf(stderr, "FAIL req_system_role body: %s\n", out);
+                g_fail++;
+            } else {
+                printf("ok req_system_role\n");
+            }
+            free(out);
+        }
+    }
+
+    {
+        /* Unknown role in messages[] must be skipped with WARN, not fail. */
+        ngx_http_ao_req_opt_t  opt;
+        char                  *out;
+        size_t                 out_n;
+        const char            *in =
+            "{\"model\":\"claude-x\",\"max_tokens\":16,"
+            "\"messages\":["
+            "{\"role\":\"user\",\"content\":\"hi\"},"
+            "{\"role\":\"robot\",\"content\":\"beep\"}"
+            "]}";
+
+        memset(&opt, 0, sizeof(opt));
+        out = ngx_http_ao_convert_request((unsigned char *) in, strlen(in),
+                                          &opt, &out_n);
+        if (out == NULL) {
+            fprintf(stderr, "FAIL req_unknown_role should skip, got err: %s\n",
+                    opt.err ? opt.err : "null");
+            g_fail++;
+        } else if (strstr(out, "beep") != NULL) {
+            fprintf(stderr, "FAIL req_unknown_role kept robot msg: %s\n", out);
+            g_fail++;
+        } else {
+            printf("ok req_unknown_role\n");
+            free(out);
+        }
+    }
+
+    {
         ngx_http_ao_req_opt_t  opt;
         char                  *out;
         const char            *in =
