@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 root = Path(__file__).resolve().parents[2]
 class Req(c.Structure):
-    _fields_ = [('model_override',c.c_char_p),('stream_usage',c.c_int),('client_stream',c.c_int),('orig_model',c.c_char*256),('err',c.c_char_p),('err_status',c.c_int)]
+    _fields_ = [('model_override',c.c_char_p),('stream_usage',c.c_int),('client_stream',c.c_int),('orig_model',c.c_char*256),('err',c.c_char_p),('err_status',c.c_int),('max_tools',c.c_int)]
 class Resp(c.Structure):
     _fields_ = [('echo_model',c.c_char_p),('err',c.c_char_p),('err_status',c.c_int)]
 def normalize(value):

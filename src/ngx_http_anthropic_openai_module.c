@@ -31,6 +31,10 @@ static ngx_conf_enum_t  ngx_http_ao_count_tokens_enum[] = {
     { ngx_null_string, 0 }
 };
 
+static ngx_conf_num_bounds_t  ngx_http_ao_max_tools_bounds = {
+    ngx_conf_check_num_bounds, 1, NGX_MAX_INT32_VALUE
+};
+
 static ngx_command_t  ngx_http_anthropic_openai_commands[] = {
 
     { ngx_string("anthropic_openai"),
@@ -67,6 +71,13 @@ static ngx_command_t  ngx_http_anthropic_openai_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_anthropic_openai_loc_conf_t, stream_usage),
       NULL },
+
+    { ngx_string("anthropic_openai_max_tools"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_anthropic_openai_loc_conf_t, max_tools),
+      &ngx_http_ao_max_tools_bounds },
 
       ngx_null_command
 };
@@ -466,6 +477,7 @@ ngx_http_anthropic_openai_request_body_filter(ngx_http_request_t *r,
     alcf = ngx_http_get_module_loc_conf(r, ngx_http_anthropic_openai_module);
     ngx_memzero(&opt, sizeof(opt));
     opt.stream_usage = (alcf->stream_usage != 0);
+    opt.max_tools = (int) alcf->max_tools;
     if (alcf->model.len) {
         u_char  *m;
         m = ngx_pnalloc(r->pool, alcf->model.len + 1);
@@ -480,8 +492,15 @@ ngx_http_anthropic_openai_request_body_filter(ngx_http_request_t *r,
     converted = ngx_http_ao_convert_request(ctx->req_buf, ctx->req_len,
                                             &opt, &out_n);
     if (converted == NULL) {
+        const char  *reason;
+
+        reason = opt.err != NULL ? opt.err : "request conversion failed";
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                      "anthropic_openai: request rejected (%s)", reason);
+        ctx->req_err = reason;
         return NGX_HTTP_BAD_REQUEST;
     }
+    ctx->req_err = NULL;
 
     ctx->client_stream = opt.client_stream ? 1 : 0;
     root = ngx_http_ao_json_parse(ctx->req_buf, ctx->req_len);
@@ -961,6 +980,7 @@ ngx_http_ao_send_error(ngx_http_request_t *r,
     ngx_http_anthropic_openai_ctx_t *ctx, ngx_uint_t status)
 {
     const char  *type;
+    const char  *msg;
     u_char      *body, *end;
 
     switch (status) {
@@ -972,13 +992,18 @@ ngx_http_ao_send_error(ngx_http_request_t *r,
     case 529: type = "overloaded_error"; break;
     default: type = "api_error"; break;
     }
-    body = ngx_pnalloc(r->pool, 192);
+    /* If a convert-time error was recorded, surface it in the message so
+       callers can tell _why_ the request was rejected (e.g. "invalid role").
+       ctx->req_err is always a short static literal, so no JSON escaping. */
+    msg = (ctx != NULL && ctx->req_err != NULL) ? ctx->req_err
+                                                : "request could not be completed";
+    body = ngx_pnalloc(r->pool, 256);
     if (body == NULL) {
         return NGX_ERROR;
     }
     end = ngx_sprintf(body,
         "{\"type\":\"error\",\"error\":{\"type\":\"%s\","
-        "\"message\":\"request could not be completed\"}}", type);
+        "\"message\":\"%s\"}}", type, msg);
     return ngx_http_ao_send_held_json(r, ctx, body, end - body, status);
 }
 
@@ -1138,6 +1163,7 @@ ngx_http_anthropic_openai_create_loc_conf(ngx_conf_t *cf)
     conf->enable = NGX_CONF_UNSET;
     conf->count_tokens = NGX_CONF_UNSET_UINT;
     conf->stream_usage = NGX_CONF_UNSET;
+    conf->max_tools = NGX_CONF_UNSET_UINT;
     return conf;
 }
 
@@ -1155,6 +1181,7 @@ ngx_http_anthropic_openai_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_uint_value(conf->count_tokens, prev->count_tokens,
                               NGX_HTTP_AO_COUNT_TOKENS_HEURISTIC);
     ngx_conf_merge_value(conf->stream_usage, prev->stream_usage, 1);
+    ngx_conf_merge_uint_value(conf->max_tools, prev->max_tools, 256);
 
     return NGX_CONF_OK;
 }

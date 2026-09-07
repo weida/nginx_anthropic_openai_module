@@ -13,6 +13,7 @@ typedef struct {
     char         orig_model[256];
     const char  *err;
     int          err_status;
+    int          max_tools;     /* 0 means use built-in default (256) */
 } ngx_http_ao_req_opt_t;
 
 char *ngx_http_ao_convert_request(unsigned char *p, size_t n,

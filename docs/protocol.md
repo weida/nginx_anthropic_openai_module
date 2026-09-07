@@ -7,12 +7,12 @@ requested capabilities independently.
 
 | Input | Upstream behavior |
 | --- | --- |
-| `system`, user/assistant text | OpenAI messages, preserving supported text. |
+| `system`, user/assistant text | OpenAI messages, preserving supported text. Mid-conversation `system` text entries remain at their original position as separate upstream system messages. |
 | `model` | Passed through unless the model directive overrides it. |
 | `max_tokens`, `temperature`, `top_p` | Corresponding Chat Completions fields. |
 | `stop_sequences` | OpenAI `stop`. |
 | URL/base64 image blocks | OpenAI `image_url` content. |
-| `tools` with name, description, `input_schema` | Function definitions with `parameters`. |
+| `tools` with name, description, `input_schema` | Function definitions with `parameters`. The tool-definition cap defaults to 256 and is configurable via `anthropic_openai_max_tools`; the separate streaming limit remains 32 tool calls per response. |
 | Assistant `tool_use` | Function `tool_calls` with serialized arguments. |
 | User `tool_result` | Tool messages associated with the tool-use ID. |
 | `tool_choice`: auto, any, none, named tool | auto, required, none, named function selection. |
@@ -51,3 +51,9 @@ The pinned Node SDK 0.39.0 oracle does not merge late input-token usage into
 `finalMessage().usage`, even when the wire event contains it. Keep wire-event
 validation separate from SDK aggregation. Mock coverage does not establish that a
 particular real backend implements tools or that a full client workflow works.
+
+Mid-conversation system content accepts strings or arrays of text blocks only.
+Unsupported roles/content and system `clear_at`/`output_config` fields return
+400 before contacting the backend; these rejected inputs are not dropped to
+make the request succeed. This subset does not imply support for all
+Anthropic beta features or validation against a particular real model.

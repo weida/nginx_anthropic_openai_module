@@ -18,7 +18,7 @@ for my $choice ([auto=>'auto'],[any=>'required'],[none=>'none']) {
 }
 my $r=exchange(request=>message(messages=>[{role=>'user',content=>[{type=>'image',source=>{type=>'url',url=>'https://example.invalid/image.png'}},{type=>'image',source=>{type=>'base64',media_type=>'image/png',data=>'YWJj'}}]}]));
 is_deeply($r->{upstream}{messages}[0]{content},[{type=>'image_url',image_url=>{url=>'https://example.invalid/image.png'}},{type=>'image_url',image_url=>{url=>'data:image/png;base64,YWJj'}}],'URL and base64 images convert without fetching');
-for my $request (message(tools=>[{type=>'bash',name=>'Bash'}]),message(tools=>[map {{name=>'tool'.$_}} 1..33]),message(messages=>[{role=>'user',content=>[{type=>'document'}]}]),message(messages=>[{role=>'user',content=>[{type=>'tool_result',tool_use_id=>'1',content=>[{type=>'image'}]}]}])) {
+for my $request (message(tools=>[{type=>'bash',name=>'Bash'}]),message(tools=>[map {{name=>'tool'.$_}} 1..257]),message(messages=>[{role=>'user',content=>[{type=>'document'}]}]),message(messages=>[{role=>'user',content=>[{type=>'tool_result',tool_use_id=>'1',content=>[{type=>'image'}]}]}])) {
  my $r=exchange(request=>$request); is($r->{status},400,'unsupported block or too many tools rejected'); is($r->{json}{error}{type},'invalid_request_error','Anthropic request error'); is($r->{hits},0,'invalid request never reaches upstream');
 }
 

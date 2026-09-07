@@ -439,7 +439,7 @@ ngx_http_ao_convert_tools(cJSON *tools, ngx_http_ao_req_opt_t *opt)
         return NULL;
     }
     n = cJSON_GetArraySize(tools);
-    if (n > 32) {
+    if (n > (opt && opt->max_tools > 0 ? opt->max_tools : 256)) {
         ngx_http_ao_fail_req(opt, "too many tools");
         return NULL;
     }
@@ -629,6 +629,48 @@ ngx_http_ao_convert_request(unsigned char *p, size_t n,
                 cJSON_Delete(root);
                 return ngx_http_ao_fail_req(opt, "unsupported content block");
             }
+        } else if (strcmp(rs, "system") == 0) {
+            cJSON  *sysmsg, *joined, *block, *type, *text;
+            int     has_image, bad, valid;
+
+            valid = cJSON_IsString(content) || cJSON_IsArray(content);
+            if (cJSON_GetObjectItemCaseSensitive(item, "clear_at") != NULL
+                || cJSON_GetObjectItemCaseSensitive(item, "output_config")
+                   != NULL)
+            {
+                valid = 0;
+            }
+            if (cJSON_IsArray(content)) {
+                cJSON_ArrayForEach(block, content) {
+                    type = cJSON_GetObjectItemCaseSensitive(block, "type");
+                    text = cJSON_GetObjectItemCaseSensitive(block, "text");
+                    if (!cJSON_IsObject(block) || !cJSON_IsString(type)
+                        || strcmp(type->valuestring, "text") != 0
+                        || !cJSON_IsString(text))
+                    {
+                        valid = 0;
+                        break;
+                    }
+                }
+            }
+            if (!valid) {
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "unsupported system content");
+            }
+
+            joined = ngx_http_ao_join_text(content, &has_image, &bad);
+            sysmsg = cJSON_CreateObject();
+            if (joined == NULL || sysmsg == NULL || has_image || bad) {
+                cJSON_Delete(joined);
+                cJSON_Delete(sysmsg);
+                cJSON_Delete(out);
+                cJSON_Delete(root);
+                return ngx_http_ao_fail_req(opt, "system conversion failed");
+            }
+            cJSON_AddStringToObject(sysmsg, "role", "system");
+            cJSON_AddItemToObject(sysmsg, "content", joined);
+            cJSON_AddItemToArray(msgs, sysmsg);
         } else {
             cJSON_Delete(out);
             cJSON_Delete(root);

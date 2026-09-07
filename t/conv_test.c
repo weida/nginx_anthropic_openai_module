@@ -132,6 +132,66 @@ main(void)
     }
 
     {
+        /* Preserve a text system-role message at its conversation position. */
+        ngx_http_ao_req_opt_t  opt;
+        char                  *out;
+        size_t                 out_n;
+        const char            *in =
+            "{\"model\":\"claude-x\",\"max_tokens\":16,"
+            "\"messages\":["
+            "{\"role\":\"user\",\"content\":\"hi\"},"
+            "{\"role\":\"system\",\"content\":\"session summary\"}"
+            "]}";
+
+        memset(&opt, 0, sizeof(opt));
+        out = ngx_http_ao_convert_request((unsigned char *) in, strlen(in),
+                                          &opt, &out_n);
+        if (out == NULL) {
+            fprintf(stderr, "FAIL req_system_role: %s\n",
+                    opt.err ? opt.err : "null");
+            g_fail++;
+        } else {
+            /* Preserve both the injected system message and original user. */
+            if (strstr(out, "\"role\":\"system\"") == NULL
+                || strstr(out, "session summary") == NULL
+                || strstr(out, "\"role\":\"user\"") == NULL)
+            {
+                fprintf(stderr, "FAIL req_system_role body: %s\n", out);
+                g_fail++;
+            } else {
+                printf("ok req_system_role\n");
+            }
+            free(out);
+        }
+    }
+
+    {
+        /* Unknown roles must fail without sending a partial conversation. */
+        ngx_http_ao_req_opt_t  opt;
+        char                  *out;
+        size_t                 out_n;
+        const char            *in =
+            "{\"model\":\"claude-x\",\"max_tokens\":16,"
+            "\"messages\":["
+            "{\"role\":\"user\",\"content\":\"hi\"},"
+            "{\"role\":\"robot\",\"content\":\"beep\"}"
+            "]}";
+
+        memset(&opt, 0, sizeof(opt));
+        out = ngx_http_ao_convert_request((unsigned char *) in, strlen(in),
+                                          &opt, &out_n);
+        if (out != NULL || opt.err == NULL
+            || strcmp(opt.err, "invalid role") != 0)
+        {
+            fprintf(stderr, "FAIL req_unknown_role must reject\n");
+            g_fail++;
+        } else {
+            printf("ok req_unknown_role\n");
+        }
+        free(out);
+    }
+
+    {
         ngx_http_ao_req_opt_t  opt;
         char                  *out;
         const char            *in =

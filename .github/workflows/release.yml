@@ -37,8 +37,16 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Prepare PR merge with public CI identity
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git -c user.name='Module CI' -c user.email=ci@agents.invalid \
+            -c commit.gpgsign=false merge --no-edit --no-ff "$BASE_SHA"
       - name: Check scripts and public source history
         run: |
           python3 -m unittest discover -s t -p 'test_*.py'
@@ -81,7 +89,7 @@ jobs:
         run: |
           python3 scripts/package.py --nginx-version "$NGINX_VERSION" \
             --variant "$BUILD_VARIANT" --arch "$BUILD_ARCH" \
-            --source-commit "$GITHUB_SHA" --build-image "$BUILD_IMAGE"
+            --source-commit "$(git rev-parse HEAD)" --build-image "$BUILD_IMAGE"
           python3 scripts/check-public.py --history --artifacts dist
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
